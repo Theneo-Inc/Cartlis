@@ -3,40 +3,34 @@ Usage:
 python client.py --api-spec-file ../openapi-specs/hivelocity.yaml
 """
 
-import argparse
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 
+import yaml
 from openai import OpenAI
 
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--api-spec-file",
-    type=str,
-    help="Path to the API specification file (absolute or relative)",
+# Constants
+BASE_RULES_FILE_PATH = "base_rules.yaml"
+
+
+# Environment Variables
+API_SPEC_FILE_PATH = os.environ.get("API_SPEC_FILE_PATH")
+COMPLIANCE_STANDARDS = os.environ.get("COMPLIANCE_STANDARDS")
+MODEL_URL = os.environ.get("MODEL_URL")
+MODEL_NAME = os.environ.get("MODEL_NAME")
+MODEL_KEY = os.environ.get("MODEL_KEY", "EMPTY")
+TEMP = float(os.environ.get("TEMP", 0.3))
+
+if not MODEL_URL.endswith("/v1"):
+    MODEL_URL = f"{MODEL_URL}/v1"
+
+client = OpenAI(
+    api_key=MODEL_KEY,
+    base_url=MODEL_URL,
 )
-args = parser.parse_args()
-api_spec_file_path = args.api_spec_file if args.api_spec_file else "hivelocity.yaml"
-api_spec_file_path = os.path.abspath(api_spec_file_path)
-compliance_standards = "GDPR, SOC2"
-model_url = "https://services.komodo.io/skqse3sptzoc5gre2zlf5yk/v1"
-model_name = "meta-llama/Meta-Llama-3.1-8B-Instruct"
-temp = 0.3
 # stop_token_ids = "128009,128001"
 
-# Set OpenAI's API key and API base to use vLLM's API server.
-openai_api_key = "EMPTY"
-openai_api_base = model_url
-client = OpenAI(
-    api_key=openai_api_key,
-    base_url=openai_api_base,
-)
-
-# model_name = "gpt-4o"
-# chatgpt_api_key = ""
-# client = OpenAI(api_key=chatgpt_api_key)
-
-system_message = """
+RULE_GENERATION_SYSTEM_MESSAGE = """
 **Prompt:**
 
 You are an API governance AI agent. Your task is to generate a single YAML file based on the provided OpenAPI specification and compliance requirements. The output should consist only of the YAML file with a top-level `rules` array. No additional text or explanations should be included in the output, just the complete YAML file.
@@ -268,41 +262,82 @@ rules:
 """
 
 
-api_spec_file_str = ""
-with open(api_spec_file_path, "r") as f:
-    api_spec_file_str = f.read()
+def read_api_spec_file(api_spec_file_path):
+    with open(api_spec_file_path, "r") as f:
+        return f.read()
 
-print(f"Loaded API spec from {api_spec_file_path}")
 
-user_message = f"""
-I require the {compliance_standards} compliance standards. Here's my API spec:
-{api_spec_file_str}
-"""
+def generate_rules(api_spec_file_path, compliance_standards):
+    api_spec_file_str = read_api_spec_file(api_spec_file_path)
+    print(f"Loaded API spec from {api_spec_file_path}")
 
-print(f"Assembled user message, compliances: {compliance_standards}")
+    user_message = f"""
+    I require the {compliance_standards} compliance standards. Here's my API spec:
+    {api_spec_file_str}
+    """
 
-messages = [
-    {"role": "system", "content": system_message},
-    {"role": "user", "content": user_message},
-]
+    print(f"Assembled user message, compliances: {compliance_standards}")
 
-t_one = datetime.now()
-completion = client.chat.completions.create(
-    model=model_name,
-    messages=messages,
-    temperature=temp,
-    stream=False,
-)
-t_two = datetime.now()
+    messages = [
+        {"role": "system", "content": RULE_GENERATION_SYSTEM_MESSAGE},
+        {"role": "user", "content": user_message},
+    ]
 
-duration = t_two - t_one
+    t_one = datetime.now()
+    completion = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=messages,
+        temperature=TEMP,
+        stream=False,
+    )
+    t_two = datetime.now()
+    duration = t_two - t_one
 
-response_content = completion.choices[0].message.content
-usage = completion.usage
+    response_content = completion.choices[0].message.content
+    usage = completion.usage
 
-print(completion.choices[0].message.content)
+    yaml_content = (
+        response_content.split("```yaml")[1].split("```")[0]
+        if "```yaml" in response_content
+        else response_content.split("```yml")[1].split("```")[0]
+    )
+    yaml_content = yaml_content.strip()
+    # print(yaml_content)
+    # print(
+    #     f"Tokens - prompt {usage.prompt_tokens}, completion {usage.completion_tokens}, total {usage.total_tokens}"
+    # )
+    # print(f"Duration: {duration.seconds} seconds")
 
-print(
-    f"Tokens - prompt {usage.prompt_tokens}, completion {usage.completion_tokens}, total {usage.total_tokens}"
-)
-print(f"Duration: {duration.seconds} seconds")
+    return (
+        yaml_content,
+        usage.prompt_tokens,
+        usage.completion_tokens,
+        usage.total_tokens,
+        duration.seconds,
+    )
+
+
+def update_base_rules(base_rules_path: str, new_rules: str, output_path: str) -> str:
+    with open(base_rules_path, "r") as f:
+        base_rules = yaml.safe_load(f)
+
+    new_rules_dict = yaml.safe_load(new_rules)
+
+    # Ensure both base_rules and new_rules_dict have a 'rules' key at the top level
+    if "rules" not in base_rules:
+        base_rules = {"rules": base_rules}
+    if "rules" not in new_rules_dict:
+        new_rules_dict = {"rules": new_rules_dict}
+
+    print(f"# base rules: {len(base_rules['rules'])}")
+    print(f"# new rules: {len(new_rules_dict['rules'])}")
+    # Merge the rules lists
+    merged_rules = {"rules": base_rules["rules"] + new_rules_dict["rules"]}
+
+    print(f"# merged rules: {len(merged_rules['rules'])}")
+
+    return merged_rules
+
+
+new_rules, _, _, _, _ = generate_rules(API_SPEC_FILE_PATH, COMPLIANCE_STANDARDS)
+update_base_rules(BASE_RULES_FILE_PATH, new_rules, "new_rules.yaml")
