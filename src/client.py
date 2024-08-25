@@ -317,7 +317,7 @@ def generate_rules(api_spec_file_path, compliance_standards):
     )
 
 
-def update_base_rules(base_rules_path: str, new_rules: str, output_path: str) -> str:
+def update_base_rules(base_rules_path: str, new_rules: str):
     with open(base_rules_path, "r") as f:
         base_rules = yaml.safe_load(f)
 
@@ -339,5 +339,11 @@ def update_base_rules(base_rules_path: str, new_rules: str, output_path: str) ->
     return merged_rules
 
 
-# new_rules, _, _, _, _ = generate_rules(API_SPEC_FILE_PATH, COMPLIANCE_STANDARDS)
-# update_base_rules(BASE_RULES_FILE_PATH, new_rules, "new_rules.yaml")
+def write_rules_to_file(rules, output_path: str):
+    with open(output_path, "w") as f:
+        yaml.dump(rules, f)
+
+
+new_rules, _, _, _, _ = generate_rules(API_SPEC_FILE_PATH, COMPLIANCE_STANDARDS)
+merged_rules = update_base_rules(BASE_RULES_FILE_PATH, new_rules)
+write_rules_to_file(merged_rules, "new_rules.yaml")
