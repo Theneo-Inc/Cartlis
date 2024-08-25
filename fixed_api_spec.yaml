@@ -1,0 +1,140 @@
+basePath: /v1
+consumes:
+- application/json
+definitions:
+  Error:
+    properties:
+      code:
+        format: int32
+        type: integer
+      message:
+        type: string
+    required:
+    - code
+    - message
+  Pet:
+    properties:
+      id:
+        format: int64
+        type: integer
+      name:
+        type: string
+      tag:
+        type: string
+    required:
+    - id
+    - name
+  Pets:
+    items:
+      $ref: '#/definitions/Pet'
+    type: array
+host: petstore.swagger.io
+info:
+  license:
+    name: MIT
+  title: Swagger Petstore
+  version: 1.0.0
+paths:
+  /v1/pets:
+    get:
+      operationId: listPets
+      parameters:
+      - description: ''
+        format: int32
+        in: query
+        name: limit
+        required: false
+        type: integer
+      responses:
+        '200':
+          headers:
+            Cache-Control:
+              schema:
+                description: Caching directive for improving performance
+                type: string
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+            x-next:
+              description: ''
+              type: string
+          schema:
+            $ref: '#/definitions/Pets'
+        default:
+          schema:
+            $ref: '#/definitions/Error'
+      security:
+      - OAuth2:
+          scopes:
+            read: Allows reading from the resource.
+            write: Allows writing to the resource.
+      summary: List all pets
+      tags:
+      - pets
+    post:
+      operationId: createPets
+      responses:
+        '201':
+          description: ''
+        default:
+          description: unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+      security:
+      - OAuth2:
+          scopes:
+            read: Allows reading from the resource.
+            write: Allows writing to the resource.
+      summary: Create a pet
+      tags:
+      - pets
+  /v1/pets/{petId}:
+    get:
+      operationId: showPetById
+      parameters:
+      - description: ''
+        in: path
+        name: pet_id
+        required: true
+        type: string
+      responses:
+        '200':
+          headers:
+            Cache-Control:
+              schema:
+                description: Caching directive for improving performance
+                type: string
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+          schema:
+            $ref: '#/definitions/Pets'
+        default:
+          description: unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+      security:
+      - OAuth2:
+          scopes:
+            read: Allows reading from the resource.
+            write: Allows writing to the resource.
+      summary: Info for a specific pet
+      tags:
+      - pets
+produces:
+- application/json
+schemes:
+- http
+swagger: '2.0'
