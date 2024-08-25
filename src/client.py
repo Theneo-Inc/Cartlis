@@ -339,5 +339,5 @@ def update_base_rules(base_rules_path: str, new_rules: str, output_path: str) ->
     return merged_rules
 
 
-new_rules, _, _, _, _ = generate_rules(API_SPEC_FILE_PATH, COMPLIANCE_STANDARDS)
-update_base_rules(BASE_RULES_FILE_PATH, new_rules, "new_rules.yaml")
+# new_rules, _, _, _, _ = generate_rules(API_SPEC_FILE_PATH, COMPLIANCE_STANDARDS)
+# update_base_rules(BASE_RULES_FILE_PATH, new_rules, "new_rules.yaml")
